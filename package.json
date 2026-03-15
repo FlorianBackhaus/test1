@@ -1,0 +1,22 @@
+{
+  "name": "n8n-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for n8n workflow management (create, read, update - no publish)",
+  "type": "module",
+  "bin": {
+    "n8n-mcp-server": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

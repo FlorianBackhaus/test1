@@ -1,0 +1,71 @@
+# n8n MCP Server
+
+MCP Server für Claude Code, um n8n Workflows zu verwalten.
+
+## Erlaubte Operationen
+- Workflows auflisten, lesen, erstellen, updaten
+- Tags auflisten
+- Executions ansehen (zum Debugging)
+
+## Bewusst NICHT erlaubt
+- Workflows aktivieren/deaktivieren (publishen)
+- Workflows löschen
+- Workflows manuell ausführen
+
+## Setup
+
+### 1. Dependencies installieren
+
+```bash
+npm install
+npm run build
+```
+
+### 2. n8n API-Key erstellen
+
+In deiner n8n-Instanz: **Settings → API → Create API Key**
+
+### 3. n8n URL finden
+
+Öffne n8n im Browser. Die URL in der Adressleiste ist deine Base-URL (z.B. `https://dein-name.app.n8n.cloud`).
+Bei Hostinger findest du die URL auch im Hostinger Dashboard unter deiner n8n-Installation.
+
+### 4. In Claude Code konfigurieren
+
+Füge folgendes in deine Claude Code MCP-Konfiguration ein (`~/.claude/settings.json` oder `.claude/settings.json` im Projekt):
+
+```json
+{
+  "mcpServers": {
+    "n8n": {
+      "command": "node",
+      "args": ["<PFAD-ZU-DIESEM-PROJEKT>/dist/index.js"],
+      "env": {
+        "N8N_BASE_URL": "https://deine-n8n-url.com",
+        "N8N_API_KEY": "dein-api-key"
+      }
+    }
+  }
+}
+```
+
+Ersetze:
+- `<PFAD-ZU-DIESEM-PROJEKT>` mit dem absoluten Pfad zu diesem Ordner
+- `https://deine-n8n-url.com` mit deiner n8n-URL
+- `dein-api-key` mit deinem n8n API-Key
+
+### 5. Claude Code neu starten
+
+Nach dem Konfigurieren Claude Code neu starten. Danach stehen die n8n-Tools zur Verfügung.
+
+## Verfügbare Tools
+
+| Tool | Beschreibung |
+|------|-------------|
+| `list_workflows` | Alle Workflows auflisten |
+| `get_workflow` | Workflow-Details inkl. Nodes und Connections |
+| `create_workflow` | Neuen Workflow erstellen (immer inaktiv) |
+| `update_workflow` | Bestehenden Workflow bearbeiten |
+| `list_tags` | Tags auflisten |
+| `list_executions` | Ausführungs-Historie ansehen |
+| `get_execution` | Details einer Ausführung |
