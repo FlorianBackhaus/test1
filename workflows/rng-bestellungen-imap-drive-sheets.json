@@ -1,0 +1,547 @@
+{
+  "name": "RNG Bestellungen - IMAP zu Drive + Sheets",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-1180, 136],
+      "id": "383e3846-3b0f-40ca-a59d-230dceca3981",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "mailboxPath": {
+          "__rl": true,
+          "value": "RNG Bestellungen",
+          "mode": "list",
+          "cachedResultName": "RNG Bestellungen"
+        },
+        "emailDateRange": {
+          "since": ""
+        },
+        "emailFlags": {},
+        "emailSearchFilters": {},
+        "limit": 10
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [-960, 136],
+      "id": "3a3b5d09-f2dc-4025-9d8a-0987f76e33d9",
+      "name": "GetEmailsList email",
+      "credentials": {
+        "imap": {
+          "id": "C1JxpIDBJWlZCIiW",
+          "name": "IMAP account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "8f7a7ec2-082c-4723-97db-2e6ccf4c8529",
+      "name": "🔁 Loop über E-Mails",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-736, 136]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "cond1",
+              "leftValue": "={{ $json.attachments ? $json.attachments.length : 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8f9cc925-2547-4835-893a-b9c629e80a28",
+      "name": "🔍 Hat Anhang?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-512, 136]
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "downloadAttachment",
+        "mailboxPath": {
+          "__rl": true,
+          "value": "RNG Bestellungen",
+          "mode": "list",
+          "cachedResultName": "RNG Bestellungen"
+        },
+        "emailUid": "={{ $json.uid }}",
+        "allAttachments": true
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [-288, 64],
+      "id": "f6d239a3-a47e-404f-9329-c38f737da796",
+      "name": "DownloadAttachment email",
+      "credentials": {
+        "imap": {
+          "id": "C1JxpIDBJWlZCIiW",
+          "name": "IMAP account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "inputDataFieldName": "attachment_0",
+        "name": "={{ $binary.attachment_0.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "value": "myDrive",
+          "mode": "list"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "1Whb6tabwrvCusMM0x83ILjMXbvvCnoKT",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "57b6dcb0-151e-461e-bfdb-663d36843b6c",
+      "name": "☁️ PDF → Google Drive",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [-64, 64],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "eYsMWLSs613cRuxd",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const item = $input.first();\nconst binaryData = await this.helpers.getBinaryDataBuffer(item, 'attachment_0');\nconst base64 = binaryData.toString('base64');\n\nreturn [{\n  json: {\n    ...item.json,\n    pdfBase64: base64,\n    filename: item.binary?.attachment_0?.fileName || 'attachment.pdf'\n  }\n}];"
+      },
+      "id": "32727028-bfd8-4c4e-b662-24b575c8a382",
+      "name": "🔧 Daten vorbereiten",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [160, 64]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 2000,\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"document\",\n          \"source\": {\n            \"type\": \"base64\",\n            \"media_type\": \"application/pdf\",\n            \"data\": \"{{ $json.pdfBase64 }}\"\n          }\n        },\n        {\n          \"type\": \"text\",\n          \"text\": \"Lies dieses PDF (RheinNetz Bestellung oder Bestelländerung) und extrahiere alle relevanten Daten.\\n\\nGib AUSSCHLIESSLICH ein JSON-Objekt zurück, kein Text davor oder danach, keine Markdown-Backticks.\\n\\nStruktur:\\n{\\n  \\\"dokumenttyp\\\": \\\"Bestellung\\\" oder \\\"Änderung zur Bestellung\\\",\\n  \\\"bestellnummer\\\": \\\"string\\\",\\n  \\\"bestelldatum\\\": \\\"DD.MM.YYYY\\\",\\n  \\\"tagesdatum\\\": \\\"DD.MM.YYYY\\\",\\n  \\\"kontrakt_nr\\\": \\\"string oder null\\\",\\n  \\\"ansprechpartner\\\": \\\"string\\\",\\n  \\\"ansprechpartner_tel\\\": \\\"string\\\",\\n  \\\"ansprechpartner_email\\\": \\\"string\\\",\\n  \\\"lieferantennr\\\": \\\"string\\\",\\n  \\\"anlieferadresse_name\\\": \\\"string oder null\\\",\\n  \\\"anlieferadresse_strasse\\\": \\\"string\\\",\\n  \\\"anlieferadresse_plz\\\": \\\"string\\\",\\n  \\\"anlieferadresse_ort\\\": \\\"string\\\",\\n  \\\"zahlungsbedingungen\\\": \\\"string\\\",\\n  \\\"gesamtnettowert\\\": 0,\\n  \\\"positionen\\\": [\\n    {\\n      \\\"position_nr\\\": \\\"string\\\",\\n      \\\"zeilen_nr\\\": \\\"string\\\",\\n      \\\"bezeichnung\\\": \\\"string\\\",\\n      \\\"auftrag_nr\\\": \\\"string oder null\\\",\\n      \\\"projekt\\\": \\\"string oder null\\\",\\n      \\\"liefertermin\\\": \\\"DD.MM.YYYY oder null\\\",\\n      \\\"menge\\\": 0,\\n      \\\"einheit\\\": \\\"string\\\",\\n      \\\"einzelpreis\\\": 0,\\n      \\\"gesamtpreis\\\": 0\\n    }\\n  ]\\n}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "d6401856-94c4-4675-ba79-132fbabf1783",
+      "name": "🤖 Claude - PDF auslesen",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [384, 64],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "9msElwrZrcSBWMV6",
+          "name": "PDF auslesen"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "cond_claude_ok",
+              "leftValue": "={{ $json.content ? $json.content.length : 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "a1b2c3d4-1111-2222-3333-444455556666",
+      "name": "🔍 Claude Antwort OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [608, 64]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst prev = $('🔧 Daten vorbereiten').first().json;\n\nconst rawText = item.json.content?.[0]?.text || '';\nlet parsed;\ntry {\n  const clean = rawText.replace(/```json|```/g, '').trim();\n  parsed = JSON.parse(clean);\n} catch(e) {\n  throw new Error('JSON Parse Fehler: ' + rawText.substring(0, 200));\n}\n\nconst positionen = parsed.positionen || [];\nconst rows = positionen.map(pos => ({\n  json: {\n    email_id: prev.emailId || '',\n    email_datum: prev.emailDate || '',\n    pdf_dateiname: prev.filename,\n    dokumenttyp: parsed.dokumenttyp,\n    bestellnummer: parsed.bestellnummer,\n    bestelldatum: parsed.bestelldatum,\n    tagesdatum: parsed.tagesdatum,\n    kontrakt_nr: parsed.kontrakt_nr || '',\n    ansprechpartner: parsed.ansprechpartner,\n    ansprechpartner_tel: parsed.ansprechpartner_tel,\n    ansprechpartner_email: parsed.ansprechpartner_email,\n    lieferantennr: parsed.lieferantennr,\n    anlieferadresse_name: parsed.anlieferadresse_name || '',\n    anlieferadresse_strasse: parsed.anlieferadresse_strasse,\n    anlieferadresse_plz: parsed.anlieferadresse_plz,\n    anlieferadresse_ort: parsed.anlieferadresse_ort,\n    zahlungsbedingungen: parsed.zahlungsbedingungen,\n    gesamtnettowert: parsed.gesamtnettowert,\n    position_nr: pos.position_nr,\n    zeilen_nr: pos.zeilen_nr,\n    bezeichnung: pos.bezeichnung,\n    auftrag_nr: pos.auftrag_nr || '',\n    projekt: pos.projekt || '',\n    liefertermin: pos.liefertermin || '',\n    menge: pos.menge,\n    einheit: pos.einheit,\n    einzelpreis: pos.einzelpreis,\n    gesamtpreis: pos.gesamtpreis,\n    duplikat_key: parsed.bestellnummer + '_' + pos.position_nr\n  }\n}));\n\nreturn rows.length > 0 ? rows : [{ json: { skip: true } }];"
+      },
+      "id": "ad9d44aa-6a71-4836-8750-70f55d374749",
+      "name": "📊 Positionen aufteilen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [832, 64]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "cond_skip",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "notEquals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "b1c2d3e4-5555-6666-7777-888899990000",
+      "name": "🔍 Kein Skip?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1056, 64]
+    },
+    {
+      "parameters": {
+        "operation": "lookup",
+        "documentId": {
+          "__rl": true,
+          "value": "1tAGfIor5Hs-PkPRdWqdMYwGHGebAijy6",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Bestellungen",
+          "mode": "name"
+        },
+        "lookupColumn": "duplikat_key",
+        "lookupValue": "={{ $json.duplikat_key }}",
+        "options": {}
+      },
+      "id": "22c2ba57-ae31-4d88-a78a-8187a10f136f",
+      "name": "🔎 Duplikat prüfen",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1280, 64],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "t104Q88eI4TGHzjd",
+          "name": "Google Sheets account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "conditions": [
+            {
+              "id": "cond3",
+              "leftValue": "={{ $json.duplikat_key }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "48410aa0-093a-47ce-abbb-4fc161192c18",
+      "name": "🔍 Noch nicht vorhanden?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1504, 64]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1tAGfIor5Hs-PkPRdWqdMYwGHGebAijy6",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "Bestellungen",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "email_id": "={{ $('📊 Positionen aufteilen').item.json.email_id }}",
+            "email_datum": "={{ $('📊 Positionen aufteilen').item.json.email_datum }}",
+            "pdf_dateiname": "={{ $('📊 Positionen aufteilen').item.json.pdf_dateiname }}",
+            "dokumenttyp": "={{ $('📊 Positionen aufteilen').item.json.dokumenttyp }}",
+            "bestellnummer": "={{ $('📊 Positionen aufteilen').item.json.bestellnummer }}",
+            "bestelldatum": "={{ $('📊 Positionen aufteilen').item.json.bestelldatum }}",
+            "tagesdatum": "={{ $('📊 Positionen aufteilen').item.json.tagesdatum }}",
+            "kontrakt_nr": "={{ $('📊 Positionen aufteilen').item.json.kontrakt_nr }}",
+            "ansprechpartner": "={{ $('📊 Positionen aufteilen').item.json.ansprechpartner }}",
+            "ansprechpartner_tel": "={{ $('📊 Positionen aufteilen').item.json.ansprechpartner_tel }}",
+            "ansprechpartner_email": "={{ $('📊 Positionen aufteilen').item.json.ansprechpartner_email }}",
+            "lieferantennr": "={{ $('📊 Positionen aufteilen').item.json.lieferantennr }}",
+            "anlieferadresse_name": "={{ $('📊 Positionen aufteilen').item.json.anlieferadresse_name }}",
+            "anlieferadresse_strasse": "={{ $('📊 Positionen aufteilen').item.json.anlieferadresse_strasse }}",
+            "anlieferadresse_plz": "={{ $('📊 Positionen aufteilen').item.json.anlieferadresse_plz }}",
+            "anlieferadresse_ort": "={{ $('📊 Positionen aufteilen').item.json.anlieferadresse_ort }}",
+            "zahlungsbedingungen": "={{ $('📊 Positionen aufteilen').item.json.zahlungsbedingungen }}",
+            "gesamtnettowert": "={{ $('📊 Positionen aufteilen').item.json.gesamtnettowert }}",
+            "position_nr": "={{ $('📊 Positionen aufteilen').item.json.position_nr }}",
+            "zeilen_nr": "={{ $('📊 Positionen aufteilen').item.json.zeilen_nr }}",
+            "bezeichnung": "={{ $('📊 Positionen aufteilen').item.json.bezeichnung }}",
+            "auftrag_nr": "={{ $('📊 Positionen aufteilen').item.json.auftrag_nr }}",
+            "projekt": "={{ $('📊 Positionen aufteilen').item.json.projekt }}",
+            "liefertermin": "={{ $('📊 Positionen aufteilen').item.json.liefertermin }}",
+            "menge": "={{ $('📊 Positionen aufteilen').item.json.menge }}",
+            "einheit": "={{ $('📊 Positionen aufteilen').item.json.einheit }}",
+            "einzelpreis": "={{ $('📊 Positionen aufteilen').item.json.einzelpreis }}",
+            "gesamtpreis": "={{ $('📊 Positionen aufteilen').item.json.gesamtpreis }}",
+            "duplikat_key": "={{ $('📊 Positionen aufteilen').item.json.duplikat_key }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "b0ff3493-dfc2-487f-87e6-994f724995f1",
+      "name": "✅ In Sheets eintragen",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1728, 64],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "t104Q88eI4TGHzjd",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {
+      "main": [
+        [
+          {
+            "node": "GetEmailsList email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GetEmailsList email": {
+      "main": [
+        [
+          {
+            "node": "🔁 Loop über E-Mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔁 Loop über E-Mails": {
+      "main": [
+        [],
+        [
+          {
+            "node": "🔍 Hat Anhang?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Hat Anhang?": {
+      "main": [
+        [
+          {
+            "node": "DownloadAttachment email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔁 Loop über E-Mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DownloadAttachment email": {
+      "main": [
+        [
+          {
+            "node": "☁️ PDF → Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "☁️ PDF → Google Drive": {
+      "main": [
+        [
+          {
+            "node": "🔧 Daten vorbereiten",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔧 Daten vorbereiten": {
+      "main": [
+        [
+          {
+            "node": "🤖 Claude - PDF auslesen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🤖 Claude - PDF auslesen": {
+      "main": [
+        [
+          {
+            "node": "🔍 Claude Antwort OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Claude Antwort OK?": {
+      "main": [
+        [
+          {
+            "node": "📊 Positionen aufteilen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔁 Loop über E-Mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📊 Positionen aufteilen": {
+      "main": [
+        [
+          {
+            "node": "🔍 Kein Skip?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Kein Skip?": {
+      "main": [
+        [
+          {
+            "node": "🔎 Duplikat prüfen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔁 Loop über E-Mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔎 Duplikat prüfen": {
+      "main": [
+        [
+          {
+            "node": "🔍 Noch nicht vorhanden?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔍 Noch nicht vorhanden?": {
+      "main": [
+        [
+          {
+            "node": "✅ In Sheets eintragen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "🔁 Loop über E-Mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "✅ In Sheets eintragen": {
+      "main": [
+        [
+          {
+            "node": "🔁 Loop über E-Mails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "e2126b74-82e4-46d1-a594-e3cfe1812c33",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f2144252e472c7f21e9cb2a78221a294ef4fce5aa400a3b55a71a5e1a6307abc"
+  },
+  "id": "ORt9RX7awj4QAlTB",
+  "tags": []
+}
