@@ -190,4 +190,40 @@ export class N8nClient {
   async updateVariable(id: string, key: string, value: string): Promise<N8nVariable> {
     return this.request("PUT", `/variables/${encodeURIComponent(id)}`, { key, value });
   }
+
+  // --- Templates ---
+
+  /** Search workflow templates */
+  async searchTemplates(query: string): Promise<unknown> {
+    return this.request("GET", `/templates/search?search=${encodeURIComponent(query)}`);
+  }
+
+  /** Get a specific workflow template */
+  async getTemplate(templateId: string): Promise<unknown> {
+    return this.request("GET", `/templates/workflows/${encodeURIComponent(templateId)}`);
+  }
+
+  /** List template categories */
+  async listTemplateCategories(): Promise<unknown> {
+    return this.request("GET", "/templates/categories");
+  }
+
+  /** List template collections */
+  async listTemplateCollections(): Promise<unknown> {
+    return this.request("GET", "/templates/collections");
+  }
+
+  // --- Source Control ---
+
+  /** Pull workflows from source control (git) */
+  async sourceControlPull(force?: boolean): Promise<unknown> {
+    return this.request("POST", "/source-control/pull", { force: force ?? false });
+  }
+
+  // --- Audit ---
+
+  /** Run a security audit on the n8n instance */
+  async runAudit(): Promise<unknown> {
+    return this.request("POST", "/audit");
+  }
 }

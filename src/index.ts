@@ -393,6 +393,123 @@ server.tool(
   }
 );
 
+// --- Templates ---
+
+server.tool(
+  "search_templates",
+  "Search n8n workflow templates by keyword. Great for finding starting points and best practices for common automations.",
+  {
+    query: z.string().describe("Search keyword (e.g. 'slack notification', 'google sheets', 'email')"),
+  },
+  async ({ query }) => {
+    const result = await client.searchTemplates(query);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "get_template",
+  "Get full details of a workflow template including nodes and connections. Use this to study a template before importing it.",
+  {
+    templateId: z.string().describe("The template ID"),
+  },
+  async ({ templateId }) => {
+    const result = await client.getTemplate(templateId);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "list_template_categories",
+  "List all available template categories (e.g. Marketing, Sales, DevOps)",
+  {},
+  async () => {
+    const result = await client.listTemplateCategories();
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "list_template_collections",
+  "List curated template collections (grouped workflows for common use cases)",
+  {},
+  async () => {
+    const result = await client.listTemplateCollections();
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+// --- Source Control ---
+
+server.tool(
+  "source_control_pull",
+  "Pull workflows from connected git source control. Requires source control to be configured in n8n settings.",
+  {
+    force: z
+      .boolean()
+      .optional()
+      .describe("Force pull, overwriting local changes (default: false)"),
+  },
+  async ({ force }) => {
+    const result = await client.sourceControlPull(force);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Source control pull complete:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+);
+
+// --- Audit ---
+
+server.tool(
+  "run_audit",
+  "Run a security audit on the n8n instance. Checks workflows, credentials, and configuration for potential security issues. Requires instance owner permissions.",
+  {},
+  async () => {
+    const result = await client.runAudit();
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Security audit results:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+);
+
 // --- Start ---
 
 async function main() {

@@ -8,6 +8,9 @@ MCP Server für Claude Code, um n8n Workflows zu verwalten.
 - Tags auflisten, erstellen, umbenennen
 - Variables (Umgebungsvariablen) auflisten, erstellen, updaten
 - Executions ansehen, Details abrufen, löschen (zum Debugging/Aufräumen)
+- Templates suchen, abrufen, Kategorien/Collections durchstöbern
+- Source Control: Pull von Git (kein Push)
+- Security Audit der n8n-Instanz
 
 ## Bewusst NICHT erlaubt
 - Workflows aktivieren/deaktivieren (publishen)
@@ -15,6 +18,7 @@ MCP Server für Claude Code, um n8n Workflows zu verwalten.
 - Workflows manuell ausführen
 - Credentials erstellen/löschen (Sicherheitsrisiko)
 - Variables löschen
+- Source Control Push (nur Pull erlaubt)
 
 ## Setup
 
@@ -88,3 +92,12 @@ Nach dem Konfigurieren Claude Code neu starten. Danach stehen die n8n-Tools zur 
 | `list_executions` | Ausführungs-Historie ansehen |
 | `get_execution` | Details einer Ausführung |
 | `delete_execution` | Ausführung aus Historie löschen |
+| **Templates** | |
+| `search_templates` | Workflow-Vorlagen nach Stichwort suchen |
+| `get_template` | Template-Details inkl. Nodes und Connections |
+| `list_template_categories` | Template-Kategorien auflisten |
+| `list_template_collections` | Kuratierte Template-Sammlungen |
+| **Source Control** | |
+| `source_control_pull` | Workflows von Git-Source-Control pullen |
+| **Audit** | |
+| `run_audit` | Sicherheits-Audit der n8n-Instanz |
