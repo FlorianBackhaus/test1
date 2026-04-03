@@ -36,6 +36,23 @@ export interface N8nTag {
   updatedAt?: string;
 }
 
+export interface N8nVariable {
+  id: string;
+  key: string;
+  value: string;
+  type?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface N8nCredential {
+  id: string;
+  name: string;
+  type: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export class N8nClient {
   private baseUrl: string;
   private apiKey: string;
@@ -132,5 +149,45 @@ export class N8nClient {
   /** Get a single execution */
   async getExecution(id: string): Promise<unknown> {
     return this.request("GET", `/executions/${encodeURIComponent(id)}`);
+  }
+
+  /** Delete a single execution */
+  async deleteExecution(id: string): Promise<void> {
+    await this.request("DELETE", `/executions/${encodeURIComponent(id)}`);
+  }
+
+  /** List all credentials (sensitive data is redacted by n8n) */
+  async listCredentials(): Promise<{ data: N8nCredential[] }> {
+    return this.request("GET", "/credentials");
+  }
+
+  /** Get credential schema for a specific credential type */
+  async getCredentialSchema(typeName: string): Promise<unknown> {
+    return this.request("GET", `/credentials/schema/${encodeURIComponent(typeName)}`);
+  }
+
+  /** Create a new tag */
+  async createTag(name: string): Promise<N8nTag> {
+    return this.request("POST", "/tags", { name });
+  }
+
+  /** Update an existing tag */
+  async updateTag(id: string, name: string): Promise<N8nTag> {
+    return this.request("PUT", `/tags/${encodeURIComponent(id)}`, { name });
+  }
+
+  /** List all variables */
+  async listVariables(): Promise<{ data: N8nVariable[] }> {
+    return this.request("GET", "/variables");
+  }
+
+  /** Create a new variable */
+  async createVariable(key: string, value: string): Promise<N8nVariable> {
+    return this.request("POST", "/variables", { key, value });
+  }
+
+  /** Update an existing variable */
+  async updateVariable(id: string, key: string, value: string): Promise<N8nVariable> {
+    return this.request("PUT", `/variables/${encodeURIComponent(id)}`, { key, value });
   }
 }

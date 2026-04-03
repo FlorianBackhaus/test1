@@ -185,6 +185,214 @@ server.tool(
   }
 );
 
+server.tool(
+  "search_workflows",
+  "Search workflows by name (case-insensitive substring match)",
+  {
+    query: z.string().describe("Search string to match against workflow names"),
+  },
+  async ({ query }) => {
+    const result = await client.listWorkflows();
+    const lower = query.toLowerCase();
+    const matches = result.data.filter((w) =>
+      w.name.toLowerCase().includes(lower)
+    );
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text:
+            matches.length === 0
+              ? `No workflows found matching "${query}"`
+              : JSON.stringify(matches, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "duplicate_workflow",
+  "Duplicate an existing workflow with a new name (created as INACTIVE)",
+  {
+    workflowId: z.string().describe("The workflow ID to duplicate"),
+    newName: z.string().describe("Name for the duplicated workflow"),
+  },
+  async ({ workflowId, newName }) => {
+    const original = await client.getWorkflow(workflowId);
+    const copy = await client.createWorkflow({
+      name: newName,
+      nodes: original.nodes,
+      connections: original.connections as Record<string, unknown>,
+      settings: original.settings,
+    });
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Workflow "${original.name}" duplicated as "${newName}" (INACTIVE):\n${JSON.stringify(copy, null, 2)}`,
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "list_credentials",
+  "List all credentials available in n8n (sensitive data is redacted). Useful to find credential IDs for workflow nodes.",
+  {},
+  async () => {
+    const result = await client.listCredentials();
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result.data, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "get_credential_schema",
+  "Get the schema/fields for a credential type (e.g. 'slackApi', 'httpBasicAuth'). Useful to understand what fields a credential type requires.",
+  {
+    typeName: z
+      .string()
+      .describe(
+        "The credential type name (e.g. 'slackApi', 'gmailOAuth2Api', 'httpBasicAuth')"
+      ),
+  },
+  async ({ typeName }) => {
+    const result = await client.getCredentialSchema(typeName);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "create_tag",
+  "Create a new tag for organizing workflows",
+  {
+    name: z.string().describe("Name for the new tag"),
+  },
+  async ({ name }) => {
+    const result = await client.createTag(name);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Tag created:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "update_tag",
+  "Rename an existing tag",
+  {
+    tagId: z.string().describe("The tag ID to update"),
+    name: z.string().describe("New name for the tag"),
+  },
+  async ({ tagId, name }) => {
+    const result = await client.updateTag(tagId, name);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Tag updated:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "delete_execution",
+  "Delete a finished execution from the history (useful for cleanup)",
+  {
+    executionId: z.string().describe("The execution ID to delete"),
+  },
+  async ({ executionId }) => {
+    await client.deleteExecution(executionId);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Execution ${executionId} deleted.`,
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "list_variables",
+  "List all environment variables configured in n8n. Variables can be referenced in workflows using $vars.",
+  {},
+  async () => {
+    const result = await client.listVariables();
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(result.data, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "create_variable",
+  "Create a new environment variable in n8n (accessible in workflows via $vars.key)",
+  {
+    key: z.string().describe("Variable key/name"),
+    value: z.string().describe("Variable value"),
+  },
+  async ({ key, value }) => {
+    const result = await client.createVariable(key, value);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Variable created:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+);
+
+server.tool(
+  "update_variable",
+  "Update an existing environment variable in n8n",
+  {
+    variableId: z.string().describe("The variable ID to update"),
+    key: z.string().describe("Variable key/name"),
+    value: z.string().describe("New variable value"),
+  },
+  async ({ variableId, key, value }) => {
+    const result = await client.updateVariable(variableId, key, value);
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Variable updated:\n${JSON.stringify(result, null, 2)}`,
+        },
+      ],
+    };
+  }
+);
+
 // --- Start ---
 
 async function main() {

@@ -3,14 +3,18 @@
 MCP Server für Claude Code, um n8n Workflows zu verwalten.
 
 ## Erlaubte Operationen
-- Workflows auflisten, lesen, erstellen, updaten
-- Tags auflisten
-- Executions ansehen (zum Debugging)
+- Workflows auflisten, lesen, erstellen, updaten, suchen, duplizieren
+- Credentials auflisten und Schemas abrufen (nur lesen, keine Secrets)
+- Tags auflisten, erstellen, umbenennen
+- Variables (Umgebungsvariablen) auflisten, erstellen, updaten
+- Executions ansehen, Details abrufen, löschen (zum Debugging/Aufräumen)
 
 ## Bewusst NICHT erlaubt
 - Workflows aktivieren/deaktivieren (publishen)
 - Workflows löschen
 - Workflows manuell ausführen
+- Credentials erstellen/löschen (Sicherheitsrisiko)
+- Variables löschen
 
 ## Setup
 
@@ -62,10 +66,25 @@ Nach dem Konfigurieren Claude Code neu starten. Danach stehen die n8n-Tools zur 
 
 | Tool | Beschreibung |
 |------|-------------|
+| **Workflows** | |
 | `list_workflows` | Alle Workflows auflisten |
 | `get_workflow` | Workflow-Details inkl. Nodes und Connections |
+| `search_workflows` | Workflows nach Name suchen (Substring-Match) |
 | `create_workflow` | Neuen Workflow erstellen (immer inaktiv) |
 | `update_workflow` | Bestehenden Workflow bearbeiten |
+| `duplicate_workflow` | Bestehenden Workflow klonen (mit neuem Namen) |
+| **Credentials** | |
+| `list_credentials` | Verfügbare Credentials auflisten (sensible Daten geschwärzt) |
+| `get_credential_schema` | Schema/Felder eines Credential-Typs abrufen |
+| **Tags** | |
 | `list_tags` | Tags auflisten |
+| `create_tag` | Neuen Tag erstellen |
+| `update_tag` | Tag umbenennen |
+| **Variables** | |
+| `list_variables` | Umgebungsvariablen auflisten ($vars in Workflows) |
+| `create_variable` | Neue Variable erstellen |
+| `update_variable` | Variable aktualisieren |
+| **Executions** | |
 | `list_executions` | Ausführungs-Historie ansehen |
 | `get_execution` | Details einer Ausführung |
+| `delete_execution` | Ausführung aus Historie löschen |
