@@ -1,0 +1,112 @@
+{
+  "name": "PDF zu Markdown - AI Analyse",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "pdf-upload",
+        "options": {
+          "rawBody": true
+        },
+        "responseMode": "responseNode"
+      },
+      "id": "webhook-trigger",
+      "name": "PDF Upload Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 300]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "extract-text",
+      "name": "Text aus PDF extrahieren",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PDF-Text in strukturiertes Markdown umwandeln\nconst rawText = $input.first().json.data;\n\n// Basis-Bereinigung\nlet text = rawText\n  .replace(/\\r\\n/g, '\\n')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\n// Einfache Heuristik: Zeilen in GROSSBUCHSTABEN werden zu Headings\nconst lines = text.split('\\n');\nconst mdLines = lines.map(line => {\n  const trimmed = line.trim();\n  // Komplett uppercase und kurz = Heading\n  if (trimmed.length > 3 && trimmed.length < 80 && trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed)) {\n    return `\\n## ${trimmed}\\n`;\n  }\n  return trimmed;\n});\n\nconst markdown = mdLines.join('\\n');\nconst filename = $input.first().json.fileName || 'dokument';\nconst baseName = filename.replace(/\\.pdf$/i, '');\n\nreturn [{\n  json: {\n    fileName: `${baseName}.md`,\n    markdown: markdown,\n    originalFileName: filename,\n    charCount: markdown.length,\n    extractedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "convert-to-md",
+      "name": "In Markdown konvertieren",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.markdown }}",
+        "options": {
+          "systemMessage": "Du bist ein Dokumenten-Analyst. Du erhältst ein Dokument im Markdown-Format. Analysiere den Inhalt und erstelle:\n\n1. **Zusammenfassung** (3-5 Sätze)\n2. **Kernpunkte** (Bullet-Liste der wichtigsten Fakten)\n3. **Offene Fragen** (Was ist unklar oder fehlt?)\n4. **Kategorisierung** (Dokumenttyp, Thema, Dringlichkeit)\n\nAntworte auf Deutsch und strukturiert in Markdown."
+        }
+      },
+      "id": "ai-analysis",
+      "name": "AI Analyse",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "ai-model",
+      "name": "AI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [880, 500],
+      "credentials": {
+        "anthropicApi": {
+          "id": "DEINE_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ fileName: $('In Markdown konvertieren').first().json.fileName, charCount: $('In Markdown konvertieren').first().json.charCount, analysis: $json.text }) }}"
+      },
+      "id": "response",
+      "name": "Antwort senden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1080, 300]
+    }
+  ],
+  "connections": {
+    "PDF Upload Webhook": {
+      "main": [
+        [{ "node": "Text aus PDF extrahieren", "type": "main", "index": 0 }]
+      ]
+    },
+    "Text aus PDF extrahieren": {
+      "main": [
+        [{ "node": "In Markdown konvertieren", "type": "main", "index": 0 }]
+      ]
+    },
+    "In Markdown konvertieren": {
+      "main": [
+        [{ "node": "AI Analyse", "type": "main", "index": 0 }]
+      ]
+    },
+    "AI Model": {
+      "ai_languageModel": [
+        [{ "node": "AI Analyse", "type": "ai_languageModel", "index": 0 }]
+      ]
+    },
+    "AI Analyse": {
+      "main": [
+        [{ "node": "Antwort senden", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}

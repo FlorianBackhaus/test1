@@ -1,0 +1,185 @@
+{
+  "name": "Email-PDF zu Google Drive + AI Analyse",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [{ "mode": "everyMinute" }]
+        },
+        "filters": {
+          "hasAttachment": true
+        },
+        "options": {
+          "downloadAttachments": true
+        }
+      },
+      "id": "email-trigger",
+      "name": "Email mit PDF empfangen",
+      "type": "n8n-nodes-base.imapEmail",
+      "typeVersion": 2,
+      "position": [200, 300],
+      "credentials": {
+        "imap": {
+          "id": "DEINE_IMAP_CREDENTIAL_ID",
+          "name": "Email IMAP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.attachments[0].filename }}",
+              "rightValue": ".pdf",
+              "operator": { "type": "string", "operation": "endsWith" }
+            }
+          ]
+        }
+      },
+      "id": "is-pdf",
+      "name": "Ist PDF?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "options": {}
+      },
+      "id": "extract-text",
+      "name": "Text aus PDF extrahieren",
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.data;\nconst email = $('Email mit PDF empfangen').first().json;\n\nlet text = rawText\n  .replace(/\\r\\n/g, '\\n')\n  .replace(/\\n{3,}/g, '\\n\\n')\n  .trim();\n\n// Uppercase-Zeilen als Headings\nconst lines = text.split('\\n');\nconst mdLines = lines.map(line => {\n  const trimmed = line.trim();\n  if (trimmed.length > 3 && trimmed.length < 80 && trimmed === trimmed.toUpperCase() && /[A-Z]/.test(trimmed)) {\n    return `\\n## ${trimmed}\\n`;\n  }\n  return trimmed;\n});\n\nconst markdown = `# ${email.subject || 'Dokument'}\\n\\n> Quelle: Email von ${email.from || 'unbekannt'}  \\n> Datum: ${email.date || new Date().toISOString()}  \\n> Anhang: ${email.attachments?.[0]?.filename || 'unbekannt'}\\n\\n---\\n\\n${mdLines.join('\\n')}`;\n\nconst filename = (email.attachments?.[0]?.filename || 'dokument').replace(/\\.pdf$/i, '');\n\nreturn [{\n  json: {\n    fileName: `${filename}.md`,\n    markdown: markdown,\n    emailSubject: email.subject,\n    emailFrom: email.from\n  }\n}];"
+      },
+      "id": "convert-to-md",
+      "name": "In Markdown konvertieren",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.fileName }}",
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "DEINE_GOOGLE_DRIVE_FOLDER_ID"
+        },
+        "options": {
+          "mimeType": "text/markdown"
+        }
+      },
+      "id": "save-to-drive",
+      "name": "MD in Google Drive speichern",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [1080, 200],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "DEINE_GDRIVE_CREDENTIAL_ID",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "text": "={{ $('In Markdown konvertieren').first().json.markdown }}",
+        "options": {
+          "systemMessage": "Du bist ein Dokumenten-Analyst. Du erhältst ein Dokument im Markdown-Format. Analysiere den Inhalt und erstelle:\n\n1. **Zusammenfassung** (3-5 Sätze)\n2. **Kernpunkte** (Bullet-Liste der wichtigsten Fakten)\n3. **Handlungsempfehlungen** (Was sollte getan werden?)\n4. **Kategorisierung** (Dokumenttyp, Thema, Dringlichkeit: hoch/mittel/niedrig)\n\nAntworte auf Deutsch und strukturiert in Markdown."
+        }
+      },
+      "id": "ai-analysis",
+      "name": "AI Analyse",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [1080, 400]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "ai-model",
+      "name": "AI Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.2,
+      "position": [1100, 600],
+      "credentials": {
+        "anthropicApi": {
+          "id": "DEINE_ANTHROPIC_CREDENTIAL_ID",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Email mit PDF empfangen').first().json.from }}",
+        "subject": "=Analyse: {{ $('Email mit PDF empfangen').first().json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "send-result",
+      "name": "Analyse per Email senden",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1300, 400],
+      "credentials": {
+        "smtp": {
+          "id": "DEINE_SMTP_CREDENTIAL_ID",
+          "name": "SMTP"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Email mit PDF empfangen": {
+      "main": [
+        [{ "node": "Ist PDF?", "type": "main", "index": 0 }]
+      ]
+    },
+    "Ist PDF?": {
+      "main": [
+        [{ "node": "Text aus PDF extrahieren", "type": "main", "index": 0 }],
+        []
+      ]
+    },
+    "Text aus PDF extrahieren": {
+      "main": [
+        [{ "node": "In Markdown konvertieren", "type": "main", "index": 0 }]
+      ]
+    },
+    "In Markdown konvertieren": {
+      "main": [
+        [
+          { "node": "MD in Google Drive speichern", "type": "main", "index": 0 },
+          { "node": "AI Analyse", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "AI Model": {
+      "ai_languageModel": [
+        [{ "node": "AI Analyse", "type": "ai_languageModel", "index": 0 }]
+      ]
+    },
+    "AI Analyse": {
+      "main": [
+        [{ "node": "Analyse per Email senden", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": []
+}
