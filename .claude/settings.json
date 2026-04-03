@@ -1,0 +1,37 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd \"$CLAUDE_PROJECT_DIR\" && if [ -f package.json ] && [ -d node_modules ]; then npm run build 2>&1 || echo 'Build failed - run npm install first'; fi"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git push'; then cd \"$CLAUDE_PROJECT_DIR\" && if [ -d node_modules ]; then npm run build 2>&1 || { echo 'BLOCKED: Build failed, fix errors before pushing'; exit 1; }; fi; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE '(create_workflow|update_workflow)'; then echo \"[$(date -Iseconds)] Tool: $CLAUDE_TOOL_NAME\" >> \"$CLAUDE_PROJECT_DIR/.claude/workflow-changes.log\"; fi"
+          }
+        ]
+      }
+    ]
+  }
+}
